@@ -358,6 +358,55 @@ function runTests() {
       }, /Unknown panel/);
     })) passed++; else failed++;
 
+    // A panel that reports every never-used skill as healthy is worse than an
+    // empty one: it looks like evidence and never raises an alert (#2463).
+    if (test('renderDashboard warns that unmeasured skills say nothing about health', () => {
+      const result = dashboard.renderDashboard({
+        skillsRoot,
+        learnedRoot,
+        importedRoot,
+        homeDir,
+        runsFilePath: path.join(homeDir, '.claude', 'state', 'no-such-runs.jsonl'),
+        now,
+        warnThreshold: 0.1,
+      });
+
+      const summary = result.data.summary;
+      assert.ok(summary.unmeasured_skills > 0, 'expected unmeasured skills');
+      assert.ok(
+        result.text.includes('WARNING'),
+        'expected an explicit warning when skills have no telemetry'
+      );
+      assert.match(result.text, /unmeasured/);
+      assert.strictEqual(
+        summary.healthy_skills,
+        0,
+        'skills without runs must not be counted as healthy'
+      );
+    })) passed++; else failed++;
+
+    if (test('renderDashboard omits the warning once every skill is measured', () => {
+      const measured = dashboard.renderDashboard({
+        skillsRoot,
+        learnedRoot,
+        importedRoot,
+        homeDir,
+        runsFilePath: runsFile,
+        now,
+        warnThreshold: 0.1,
+      });
+
+      const summary = measured.data.summary;
+      if (summary.unmeasured_skills === 0) {
+        assert.ok(!measured.text.includes('WARNING'), 'no warning expected with full coverage');
+      }
+      assert.strictEqual(
+        summary.total_skills,
+        summary.measured_skills + summary.unmeasured_skills,
+        'measured and unmeasured must partition the total'
+      );
+    })) passed++; else failed++;
+
     console.log('\nCLI integration:');
 
     if (test('CLI --dashboard --json returns valid JSON with all panels', () => {

@@ -28,13 +28,22 @@ function formatRate(value) {
 
 function summarizeHealthReport(report) {
   const totalSkills = report.skills.length;
+  // A skill with no runs in the window is not healthy, it is unmeasured.
+  // Folding it into "healthy" turned a missing telemetry writer into a green
+  // dashboard across every skill (#2463) — false confidence that never triggers
+  // an alert. A declining skill always has runs, so the buckets partition the
+  // total.
+  const unmeasuredSkills = report.skills.filter(skill => !skill.run_count_30d).length;
   const decliningSkills = report.skills.filter(skill => skill.declining).length;
-  const healthySkills = totalSkills - decliningSkills;
+  const measuredSkills = totalSkills - unmeasuredSkills;
+  const healthySkills = measuredSkills - decliningSkills;
 
   return {
     total_skills: totalSkills,
+    measured_skills: measuredSkills,
     healthy_skills: healthySkills,
     declining_skills: decliningSkills,
+    unmeasured_skills: unmeasuredSkills,
   };
 }
 
@@ -230,7 +239,7 @@ function formatHealthReport(report, options = {}) {
   const lines = [
     'ECC skill health',
     `Generated: ${report.generated_at}`,
-    `Skills: ${summary.total_skills} total, ${summary.healthy_skills} healthy, ${summary.declining_skills} declining`,
+    `Skills: ${summary.total_skills} total, ${summary.measured_skills} measured, ${summary.healthy_skills} healthy, ${summary.declining_skills} declining, ${summary.unmeasured_skills} unmeasured`,
     '',
     'skill            version   7d     30d    trend       pending   last run',
     '--------------------------------------------------------------------------',

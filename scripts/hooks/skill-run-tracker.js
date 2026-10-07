@@ -16,8 +16,9 @@
  * skill id is an identifier, not free text, so anything that does not look like
  * one is dropped rather than written through.
  *
- * Best-effort: never blocks tool execution. Runs under the PostToolUse
- * dispatcher, which owns stdin, pass-through, and exit codes.
+ * Best-effort: never blocks tool execution. Under Claude Code it runs via the
+ * PostToolUse dispatcher, which owns stdin, pass-through, and exit codes; under
+ * OpenCode the ecc-hooks plugin calls run() directly with an equivalent payload.
  *
  * Cross-platform (Windows, macOS, Linux); CommonJS.
  */
@@ -102,6 +103,21 @@ function deriveOutcome(payload) {
   return 'success';
 }
 
+// Claude Code names the skill tool `Skill`; OpenCode and other harnesses name
+// it `skill`. Comparing the raw string meant a case difference silently
+// disabled the whole write side again — the hook ran, dropped every event, and
+// the dashboard kept reporting unmeasured skills with no hint why.
+const SKILL_TOOL_NAME = 'skill';
+
+function isSkillToolCall(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  const toolName = payload.tool_name;
+  return typeof toolName === 'string' && toolName.trim().toLowerCase() === SKILL_TOOL_NAME;
+}
+
 function buildRecord(payload) {
   const skillId = extractSkillId(payload.tool_input);
   if (!skillId) {
@@ -135,7 +151,7 @@ function run(rawInput) {
     const payload = typeof rawInput === 'string'
       ? (rawInput.trim() ? JSON.parse(rawInput) : {})
       : rawInput;
-    if (payload && typeof payload === 'object' && payload.tool_name === 'Skill') {
+    if (isSkillToolCall(payload)) {
       const record = buildRecord(payload);
       if (record) {
         recordSkillExecution(record);
@@ -146,4 +162,4 @@ function run(rawInput) {
   }
 }
 
-module.exports = { buildRecord, deriveOutcome, extractSkillId, run };
+module.exports = { buildRecord, deriveOutcome, extractSkillId, isSkillToolCall, run };
