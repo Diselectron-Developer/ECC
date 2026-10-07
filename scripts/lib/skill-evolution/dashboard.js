@@ -359,11 +359,22 @@ function renderDashboard(options = {}) {
   const header = [
     'ECC Skill Health Dashboard',
     `Generated: ${now}`,
-    `Skills: ${summary.total_skills} total, ${summary.healthy_skills} healthy, ${summary.declining_skills} declining`,
+    `Skills: ${summary.total_skills} total, ${summary.measured_skills} measured, ${summary.healthy_skills} healthy, ${summary.declining_skills} declining, ${summary.unmeasured_skills} unmeasured`,
     '',
   ];
 
   textParts.push(header.join('\n'));
+
+  if (summary.unmeasured_skills > 0) {
+    textParts.push([
+      `WARNING: ${summary.unmeasured_skills} of ${summary.total_skills} skills have no recorded run in the last 30 days.`,
+      'This dashboard can say nothing about them: no telemetry is an absence of evidence,',
+      'not a healthy result. Their success rate reads "n/a", which means unknown.',
+      summary.unmeasured_skills === summary.total_skills
+        ? 'Nothing has ever been recorded, so the panels below are not a signal about skill health.'
+        : 'Run a skill to start filling the gap; the declining/healthy split covers only the measured ones.',
+    ].join('\n'));
+  }
 
   if (selectedPanel) {
     const result = panelRenderers[selectedPanel]();
